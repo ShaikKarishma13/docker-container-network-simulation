@@ -1,0 +1,57 @@
+import sys 
+!pip install simpy 
+import simpy 
+class VirtualNetwork: 
+def __init__(self, env, latency=5):   # FIXED constructor 
+self.env = env 
+self.latency = latency 
+self.links = {}  # hostname → container 
+self.dns = {}    # DNS names to container names 
+def register(self, name, container): 
+self.links[name] = container 
+self.dns[name] = container.name  # Mapping simulated DNS name 
+def resolve(self, hostname): 
+“””Resolve a container name to its actual object.””” 
+if hostname in self.dns: 
+return self.links[self.dns[hostname]] 
+return None 
+def send(self, src, dest, msg): 
+“””Simulate message sending with latency.””” 
+yield self.env.timeout(self.latency) 
+dest_container = self.resolve(dest) 
+if not dest_container: 
+print(f”[{self.env.now}] {src} → {dest}: HOST NOT FOUND (DNS resolution failed)”) 
+return 
+print(f”[{self.env.now}] {src} → {dest}: {msg}”) 
+dest_container.inbox.append((src, msg)) 
+Class Container: 
+def __init__(self, env, name, network):   # FIXED constructor 
+self.env = env 
+self.name = name 
+self.network = network 
+self.inbox = [] 
+self.network.register(name, self) 
+env.process(self.run()) 
+def run(self): 
+“””Simulate container process listening for messages.””” 
+while True: 
+if self.inbox: 
+src, msg = self.inbox.pop(0) 
+print(f”[{self.env.now}] {self.name} received from {src}: {msg}”) 
+yield self.env.timeout(1) 
+def send(self, target, message): 
+“””Send message to another container.””” 
+return self.network.send(self.name, target, message) 
+# Create the environment and network 
+env = simpy.Environment() 
+net = VirtualNetwork(env, latency=3) 
+# Create containers acting as DNS names 
+app1 = Container(env, “app1”, net) 
+app2 = Container(env, “app2”, net) 
+db = Container(env, “db”, net) 
+# Simulate communication between containers 
+env.process(app1.send(“app2”, “Hello from APP1”)) 
+env.process(app2.send(“db”, “Query: SELECT * FROM users”)) 
+env.process(db.send(“app1”, “DB Response: OK”)) 
+# Run the simulation 
+env.run(until=20)
